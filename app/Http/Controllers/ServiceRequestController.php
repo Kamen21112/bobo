@@ -12,10 +12,9 @@ class ServiceRequestController extends Controller
     {
         $user = Auth::user();
         if ($user->role === 'client') {
-            $requests = ServiceRequest::where('user_id', $user->id)->orderBy('created_at', 'desc')->get();
+            $requests = ServiceRequest::where('user_id', $user->id)->where('status', 'pending')->orderBy('created_at', 'desc')->get();
         } else if ($user->role === 'mechanic' || $user->role === 'admin') {
-            // Mechanics and admins see all requests
-            $requests = ServiceRequest::with('user')->orderBy('created_at', 'desc')->get();
+            $requests = ServiceRequest::with(['user', 'car'])->where('status', 'pending')->orderBy('created_at', 'desc')->get();
         } else {
             abort(403, 'Нямате достъп до тази страница.');
         }
@@ -29,7 +28,9 @@ class ServiceRequestController extends Controller
             abort(403, 'Само клиенти могат да създават нови заявки.');
         }
 
-        return view('service_requests.create');
+        $cars = Auth::user()->cars;
+
+        return view('service_requests.create', compact('cars'));
     }
 
     public function store(Request $request)
@@ -39,15 +40,18 @@ class ServiceRequestController extends Controller
         }
 
         $validatedData = $request->validate([
-            'car_make' => 'required|string|max:255',
-            'car_model' => 'required|string|max:255',
+            'car_id' => 'required|exists:cars,id',
             'description' => 'required|string',
         ]);
 
+        $car = Auth::user()->cars()->where('id', $validatedData['car_id'])->first();
+        if (!$car) {
+            abort(403, 'Нямате права над този автомобил.');
+        }
+
         ServiceRequest::create([
             'user_id' => Auth::id(),
-            'car_make' => $validatedData['car_make'],
-            'car_model' => $validatedData['car_model'],
+            'car_id' => $car->id,
             'description' => $validatedData['description'],
             'status' => 'pending'
         ]);
@@ -63,6 +67,16 @@ class ServiceRequestController extends Controller
 
         $serviceRequest->update(['status' => 'approved']);
 
-        return redirect()->back()->with('success', 'Заявката е одобрена успешно! Можете да се свържете с клиента или да въведете данните ръчно.');
+        $serviceRequest->load('car');
+
+        \App\Models\Repair::create([
+            'title' => 'Заявка: ' . ($serviceRequest->car->make ?? '') . ' ' . ($serviceRequest->car->model ?? ''),
+            'description' => $serviceRequest->description,
+            'car_id' => $serviceRequest->car_id,
+            'mechanic_id' => Auth::id(),
+            'status' => 'in_progress',
+        ]);
+
+        return redirect()->back()->with('success', 'Заявката е одобрена и преместена в ремонти!');
     }
 }

@@ -8,8 +8,7 @@ class ServiceRequest extends Model
 {
     protected $fillable = [
         'user_id',
-        'car_make',
-        'car_model',
+        'car_id',
         'description',
         'status'
     ];
@@ -17,5 +16,10 @@ class ServiceRequest extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function car()
+    {
+        return $this->belongsTo(Car::class);
     }
 }

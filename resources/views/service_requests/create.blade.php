@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Подаване на нова заявка за ремонт
+            {{ __('Нова Заявка') }}
         </h2>
     </x-slot>
 
@@ -10,46 +10,40 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     
-                    <form method="POST" action="{{ route('service_requests.store') }}">
-                        @csrf
-
-                        {{-- Марка --}}
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="car_make">Марка на автомобила</label>
-                            <input type="text" name="car_make" id="car_make" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                            @error('car_make')
-                                <p class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
-                            @enderror
+                    @if($cars->isEmpty())
+                        <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
+                            <span class="block sm:inline">Нямате добавени автомобили във вашия профил. Моля, първо добавете автомобил в секция "Моите Автомобили", за да можете да пуснете заявка.</span>
                         </div>
+                        <a href="{{ route('my_cars.create') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            Отиди към Добавяне на Автомобил
+                        </a>
+                    @else
+                        <form action="{{ route('service_requests.store') }}" method="POST">
+                            @csrf
+                            
+                            <div class="mb-4">
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Изберете Автомобил <span class="text-red-500">*</span></label>
+                                <select name="car_id" required class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                                    <option value="" disabled selected>Изберете една от вашите коли...</option>
+                                    @foreach($cars as $car)
+                                        <option value="{{ $car->id }}">{{ $car->make }} {{ $car->model }} ({{ $car->plate_number }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                        {{-- Модел --}}
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="car_model">Модел на автомобила</label>
-                            <input type="text" name="car_model" id="car_model" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                            @error('car_model')
-                                <p class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
-                            @enderror
-                        </div>
+                            <div class="mb-4">
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Описание на проблема <span class="text-red-500">*</span></label>
+                                <textarea name="description" required rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline placeholder-gray-400" placeholder="Опишете какво не е наред с автомобила..."></textarea>
+                            </div>
 
-                        {{-- Описание --}}
-                        <div class="mb-4">
-                            <label class="block text-gray-700 text-sm font-bold mb-2" for="description">Описание на проблема</label>
-                            <textarea name="description" id="description" rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Опишете какъв е проблемът или какво искате да се свърши" required></textarea>
-                            @error('description')
-                                <p class="text-red-500 text-xs italic mt-2">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="flex items-center justify-between mt-6">
-                            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                                Изпрати Заявка
-                            </button>
-                            <a href="{{ route('service_requests.index') }}" class="text-gray-500 hover:text-gray-800 underline">
-                                Отказ
-                            </a>
-                        </div>
-                    </form>
-
+                            <div class="flex items-center justify-end">
+                                <a href="{{ route('service_requests.index') }}" class="text-gray-600 hover:text-gray-800 mr-4">Отказ</a>
+                                <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                                    Изпрати Заявка
+                                </button>
+                            </div>
+                        </form>
+                    @endif
                 </div>
             </div>
         </div>

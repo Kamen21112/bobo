@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('clients', ClientController::class)->middleware('auth');
 
     Route::resource('service_requests', App\Http\Controllers\ServiceRequestController::class)->only(['index', 'create', 'store']);
+    Route::resource('my_cars', App\Http\Controllers\ClientCarController::class)->only(['index', 'create', 'store', 'destroy']);
     Route::patch('/service_requests/{serviceRequest}/approve', [App\Http\Controllers\ServiceRequestController::class, 'approve'])->name('service_requests.approve');
 });
 

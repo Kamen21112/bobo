@@ -9,12 +9,26 @@ use Illuminate\Http\Request;
 
 class RepairController extends Controller
 {
-    // 1. Show all repairs
+    // 1. Show repairs (filtered by role)
     public function index()
     {
-        // Get all repairs and load the associated car data
-        $repairs = Repair::with('car')->get(); 
-        
+        $user = Auth::user();
+
+        if ($user->role === 'client') {
+            // Клиентът вижда само ремонти, които са свързани с неговите коли
+            $userCarIds = $user->cars()->pluck('id');
+            $repairs = Repair::with('car')->whereIn('car_id', $userCarIds)->get();
+        } elseif ($user->role === 'mechanic') {
+            // Механикът вижда своите ремонти + чакащите (които никой не е поел)
+            $repairs = Repair::with('car')
+                    ->where('mechanic_id', $user->id)
+                    ->orWhereNull('mechanic_id')
+                    ->get();
+        } else {
+            // Админът вижда всички
+            $repairs = Repair::with('car')->get();
+        }
+
         return view('repairs.index', compact('repairs'));
     }
 
@@ -51,6 +65,10 @@ class RepairController extends Controller
      */
     public function edit(Repair $repair)
     {
+        if (Auth::user()->role === 'mechanic' && $repair->mechanic_id !== Auth::id()) {
+            abort(403, 'Нямате право да променяте този ремонт.');
+        }
+
         // Отново ни трябват колите за падащото меню
         $cars = Car::all(); 
         
@@ -63,6 +81,10 @@ class RepairController extends Controller
      */
     public function update(Request $request, Repair $repair)
     {
+        if (Auth::user()->role === 'mechanic' && $repair->mechanic_id !== Auth::id()) {
+            abort(403, 'Нямате право да променяте този ремонт.');
+        }
+
         // 1. Валидация (тук вече разрешаваме и промяна на статуса)
         $validatedData = $request->validate([
             'car_id' => 'required|exists:cars,id',
@@ -84,6 +106,10 @@ class RepairController extends Controller
      */
     public function destroy(Repair $repair)
     {
+        if (Auth::user()->role === 'mechanic' && $repair->mechanic_id !== Auth::id()) {
+            abort(403, 'Нямате право да триете този ремонт.');
+        }
+
         // Изтриваме записа
         $repair->delete();
 
@@ -95,6 +121,10 @@ class RepairController extends Controller
     {
         if (Auth::user()->role !== 'mechanic') {
             abort(403, 'Само механици могат да поемат задачи.');
+        }
+        
+        if ($repair->mechanic_id !== null && $repair->mechanic_id !== Auth::id()) {
+            abort(403, 'Ремонтът вече е поет от друг механик.');
         }
 
         $repair->update([

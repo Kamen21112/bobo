@@ -12,6 +12,7 @@ class Car extends Model
     // НОВО: Добавяме client_id към разрешените полета
     protected $fillable = [
         'client_id', 
+        'user_id',
         'make',
         'model',
         'plate_number',
@@ -21,6 +22,11 @@ class Car extends Model
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function repairs()

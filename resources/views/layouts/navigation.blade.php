@@ -27,6 +27,12 @@
                         Заявки
                     </x-nav-link>
 
+                    @if(Auth::user()->role === 'client')
+                        <x-nav-link :href="route('my_cars.index')" :active="request()->routeIs('my_cars.*')">
+                            Моите Автомобили
+                        </x-nav-link>
+                    @endif
+
                     @if(Auth::user()->role !== 'client')
                         <x-nav-link :href="route('parts.index')" :active="request()->routeIs('parts.*')">
                             Склад
@@ -108,6 +114,12 @@
             <x-responsive-nav-link :href="route('service_requests.index')" :active="request()->routeIs('service_requests.*')">
                 Заявки
             </x-responsive-nav-link>
+
+            @if(Auth::user()->role === 'client')
+                <x-responsive-nav-link :href="route('my_cars.index')" :active="request()->routeIs('my_cars.*')">
+                    Моите Автомобили
+                </x-responsive-nav-link>
+            @endif
 
             @if(Auth::user()->role !== 'client')
                 <x-responsive-nav-link :href="route('parts.index')" :active="request()->routeIs('parts.*')">

@@ -30,7 +30,7 @@
                             @foreach($requests as $req)
                                 <li class="mb-4 p-4 border rounded shadow-sm flex items-center justify-between bg-gray-50">
                                     <div>
-                                        <strong>Автомобил:</strong> {{ $req->car_make }} {{ $req->car_model }} <br>
+                                        <strong>Автомобил:</strong> {{ $req->car->make ?? 'Неизвестна' }} {{ $req->car->model ?? 'кола' }}<br>
                                         <strong>Проблем:</strong> {{ $req->description }} <br>
                                         @if(Auth::user()->role !== 'client')
                                             <strong>От:</strong> {{ $req->user->name }} ({{ $req->user->email }}) <br>

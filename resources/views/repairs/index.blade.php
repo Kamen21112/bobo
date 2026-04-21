@@ -33,7 +33,11 @@
                                 <li class="mb-4 p-4 border rounded shadow-sm flex items-center justify-between bg-gray-50">
                                     <div>
                                         <strong>{{ $repair->title ?? 'Ремонт' }}</strong> 
-                                        <span class="text-gray-600">- {{ $repair->car->make }} {{ $repair->car->model }} ({{ $repair->car->plate_number }})</span>
+                                        @if($repair->car)
+                                            <span class="text-gray-600">- {{ $repair->car->make }} {{ $repair->car->model }} ({{ $repair->car->plate_number }})</span>
+                                        @else
+                                            <span class="text-gray-600">- (Нерегистриран автомобил от заявка)</span>
+                                        @endif
                                         <br>
                                         <span class="text-sm text-gray-500">
                                             Статус: 
@@ -72,8 +76,8 @@
                                             </form>
                                         @endif
 
-                                        {{-- Бутони за редактиране и изтриване (Скрити за механици) --}}
-                                        @if(Auth::user()->role !== 'client')
+                                        {{-- Бутони за редактиране и изтриване --}}
+                                        @if(Auth::user()->role === 'admin' || (Auth::user()->role === 'mechanic' && $repair->mechanic_id === Auth::id()))
                                             <a href="{{ route('repairs.edit', $repair->id) }}" class="text-sm text-yellow-600 hover:text-yellow-800 underline">
                                                 Редактирай
                                             </a>

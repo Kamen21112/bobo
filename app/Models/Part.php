@@ -11,9 +11,20 @@ class Part extends Model
 
     protected $fillable = ['name', 'part_number', 'quantity', 'price', 'supplier_id'];
 
-    // Една част идва от един доставчик
     public function supplier()
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function repairs()
+    {
+        return $this->belongsToMany(Repair::class, 'repair_parts')
+                    ->withPivot('quantity')
+                    ->withTimestamps();
+    }
+
+    public function partRequests()
+    {
+        return $this->hasMany(PartRequest::class);
     }
 }

@@ -1,152 +1,166 @@
 <?php
 
 namespace App\Http\Controllers;
-use Illuminate\Support\Facades\Auth;
 
+use App\Models\Part;
 use App\Models\Repair;
-use App\Models\Car; // We need this to get cars for the creation form
+use App\Models\Car;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class RepairController extends Controller
 {
-    // 1. Show repairs (filtered by role)
+    // Показва ремонти, групирани по дата на приемане
     public function index()
     {
         $user = Auth::user();
 
         if ($user->role === 'client') {
-            // Клиентът вижда само ремонти, които са свързани с неговите коли
             $userCarIds = $user->cars()->pluck('id');
-            $repairs = Repair::with('car')->whereIn('car_id', $userCarIds)->get();
+            $repairs = Repair::with(['car', 'mechanic', 'parts'])
+                ->whereIn('car_id', $userCarIds)
+                ->orderBy('created_at', 'desc')
+                ->get();
         } elseif ($user->role === 'mechanic') {
-            // Механикът вижда своите ремонти + чакащите (които никой не е поел)
-            $repairs = Repair::with('car')
-                    ->where('mechanic_id', $user->id)
-                    ->orWhereNull('mechanic_id')
-                    ->get();
+            $repairs = Repair::with(['car', 'mechanic', 'parts'])
+                ->where(function ($q) use ($user) {
+                    $q->where('mechanic_id', $user->id)
+                      ->orWhereNull('mechanic_id');
+                })
+                ->orderBy('claimed_at', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->get();
         } else {
-            // Админът вижда всички
-            $repairs = Repair::with('car')->get();
+            $repairs = Repair::with(['car', 'mechanic', 'parts'])
+                ->orderBy('claimed_at', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->get();
         }
 
-        return view('repairs.index', compact('repairs'));
+        // Групираме по дата на приемане (claimed_at) или дата на създаване
+        $groupedRepairs = $repairs->groupBy(function ($repair) {
+            $date = $repair->claimed_at ?? $repair->created_at;
+            return $date->format('d.m.Y');
+        });
+
+        return view('repairs.index', compact('repairs', 'groupedRepairs'));
     }
 
-    // 2. Show the form to add a new repair
     public function create()
     {
-        // We need all cars so the mechanic can select which car is being repaired
-        $cars = Car::all(); 
-        
+        $cars = Car::all();
         return view('repairs.create', compact('cars'));
     }
 
-    /**
-     * Записва новия ремонт в базата данни.
-     */
     public function store(Request $request)
     {
-        // 1. Проверяваме дали данните са валидни (сигурност и коректност)
         $validatedData = $request->validate([
-            'title' => 'required|string|max:255', // Добавяме задължително заглавие
-            'car_id' => 'required|exists:cars,id', // Предполагам, че го имаш нагоре
+            'title'       => 'required|string|max:255',
+            'car_id'      => 'required|exists:cars,id',
             'description' => 'nullable|string',
-            'price' => 'nullable|numeric|min:0',
+            'price'       => 'nullable|numeric|min:0',
         ]);
 
         Repair::create($validatedData);
-
-        // 3. Връщаме потребителя към списъка с ремонти СЪС съобщение за успех
         return redirect()->route('repairs.index')->with('success', 'Ремонтът беше добавен успешно!');
     }
 
-    /**
-     * Показва формата за редактиране на вече съществуващ ремонт.
-     */
     public function edit(Repair $repair)
     {
         if (Auth::user()->role === 'mechanic' && $repair->mechanic_id !== Auth::id()) {
             abort(403, 'Нямате право да променяте този ремонт.');
         }
-
-        // Отново ни трябват колите за падащото меню
-        $cars = Car::all(); 
-        
-        // ВРЪЩАМЕ ИЗГЛЕДА (тук беше грешката, върнах го да отваря формата за редакция)
+        $cars = Car::all();
         return view('repairs.edit', compact('repair', 'cars'));
     }
 
-    /**
-     * Обновява данните за ремонта в базата данни.
-     */
     public function update(Request $request, Repair $repair)
     {
         if (Auth::user()->role === 'mechanic' && $repair->mechanic_id !== Auth::id()) {
             abort(403, 'Нямате право да променяте този ремонт.');
         }
 
-        // 1. Валидация (тук вече разрешаваме и промяна на статуса)
         $validatedData = $request->validate([
-            'car_id' => 'required|exists:cars,id',
-            'title' => 'required|string|max:255',
+            'car_id'      => 'required|exists:cars,id',
+            'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
-            'price' => 'nullable|numeric|min:0',
-            'status' => 'required|in:pending,in_progress,completed',
+            'price'       => 'nullable|numeric|min:0',
+            'status'      => 'required|in:pending,in_progress,completed',
         ]);
 
-        // 2. Обновяваме конкретния запис
         $repair->update($validatedData);
-
-        // 3. Връщаме потребителя към списъка СЪС съобщение за успех
         return redirect()->route('repairs.index')->with('success', 'Ремонтът беше актуализиран успешно!');
     }
 
-    /**
-     * Изтрива ремонта от базата данни.
-     */
     public function destroy(Repair $repair)
     {
         if (Auth::user()->role === 'mechanic' && $repair->mechanic_id !== Auth::id()) {
             abort(403, 'Нямате право да триете този ремонт.');
         }
-
-        // Изтриваме записа
         $repair->delete();
-
-        // Връщаме се към списъка СЪС съобщение за успех
         return redirect()->route('repairs.index')->with('success', 'Ремонтът беше изтрит успешно!');
     }
 
+    // Механикът поема ремонта
     public function claim(Repair $repair)
     {
         if (Auth::user()->role !== 'mechanic') {
             abort(403, 'Само механици могат да поемат задачи.');
         }
-        
         if ($repair->mechanic_id !== null && $repair->mechanic_id !== Auth::id()) {
             abort(403, 'Ремонтът вече е поет от друг механик.');
         }
 
         $repair->update([
             'mechanic_id' => Auth::id(),
-            'status' => 'in_progress'
+            'status'      => 'in_progress',
+            'claimed_at'  => now(),
         ]);
 
         return redirect()->back()->with('success', 'Ремонтът е поет успешно!');
     }
 
-    // 2. Функция за завършване на ремонт
-    public function complete(Repair $repair)
+    // Показва формата за завършване с избор на части
+    public function showComplete(Repair $repair)
     {
-        // Само механикът, който работи по колата, може да я завърши
+        if (Auth::id() !== $repair->mechanic_id && Auth::user()->role !== 'admin') {
+            abort(403, 'Не сте зачислен към този ремонт.');
+        }
+        $parts = Part::where('quantity', '>', 0)->orderBy('name')->get();
+        return view('repairs.complete', compact('repair', 'parts'));
+    }
+
+    // Завършва ремонта и намалява наличностите
+    public function complete(Request $request, Repair $repair)
+    {
         if (Auth::id() !== $repair->mechanic_id && Auth::user()->role !== 'admin') {
             abort(403, 'Не сте зачислен към този ремонт.');
         }
 
+        // Само POST с parts данни идва от формата; обикновен PATCH = директно завърши
+        if ($request->isMethod('POST') || $request->has('parts')) {
+            $validated = $request->validate([
+                'parts'            => 'nullable|array',
+                'parts.*.part_id'  => 'required_with:parts|exists:parts,id',
+                'parts.*.quantity' => 'required_with:parts|integer|min:1',
+            ]);
+
+            if (!empty($validated['parts'])) {
+                foreach ($validated['parts'] as $usedPart) {
+                    $part = Part::findOrFail($usedPart['part_id']);
+                    $qty  = (int) $usedPart['quantity'];
+
+                    $part->update(['quantity' => max(0, $part->quantity - $qty)]);
+                    $repair->parts()->attach($part->id, ['quantity' => $qty]);
+                }
+            }
+        }
+
         $repair->update([
-            'status' => 'completed'
+            'status'       => 'completed',
+            'completed_at' => now(),
         ]);
 
-        return redirect()->back()->with('success', 'Ремонтът е завършен!');
+        return redirect()->route('repairs.index')->with('success', 'Ремонтът е завършен и частите са записани!');
     }
 }

@@ -9,18 +9,30 @@ class Repair extends Model
 {
     use HasFactory;
 
-    // Добавяме mechanic_id в списъка за записване
-    // Промени този ред:
-    protected $fillable = ['title', 'car_id', 'description', 'price', 'status', 'mechanic_id'];
+    protected $fillable = [
+        'title', 'car_id', 'description', 'price', 'status',
+        'mechanic_id', 'claimed_at', 'completed_at',
+    ];
+
+    protected $casts = [
+        'claimed_at'   => 'datetime',
+        'completed_at' => 'datetime',
+    ];
 
     public function car()
     {
         return $this->belongsTo(Car::class);
     }
 
-    // Добавяме тази връзка: Ремонтът принадлежи на Механик (User)
     public function mechanic()
     {
         return $this->belongsTo(User::class, 'mechanic_id');
+    }
+
+    public function parts()
+    {
+        return $this->belongsToMany(Part::class, 'repair_parts')
+                    ->withPivot('quantity')
+                    ->withTimestamps();
     }
 }

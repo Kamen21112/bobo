@@ -4,66 +4,57 @@ namespace App\Http\Controllers;
 
 use App\Models\Supplier;
 use Illuminate\Http\Request;
-// Imports for Laravel 11 Middleware handling
-use Illuminate\Routing\Controllers\HasMiddleware;
-use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Auth;
 
-class SupplierController extends Controller implements HasMiddleware
+class SupplierController extends Controller
 {
-    /**
-     * Define the middleware for the controller.
-     */
-    public static function middleware(): array
+    private function adminOnly(): void
     {
-        return [
-            new Middleware(function ($request, $next) {
-                // Using Auth facade to keep the IDE happy and avoid "Undefined method" errors
-                if (Auth::check() && Auth::user()->role === 'client') {
-                    abort(403, 'Клиентите нямат достъп до Склада и Доставчиците.');
-                }
-                return $next($request);
-            }),
-        ];
+        if (Auth::user()->role !== 'admin') {
+            abort(403, 'Само администраторите имат достъп до Доставчиците.');
+        }
     }
 
-    // Показва списъка с доставчици
     public function index()
     {
+        $this->adminOnly();
         $suppliers = Supplier::all();
         return view('suppliers.index', compact('suppliers'));
     }
 
-    // Показва формата за добавяне
     public function create()
     {
+        $this->adminOnly();
         return view('suppliers.create');
     }
 
-    // Записва новия доставчик в базата
     public function store(Request $request)
     {
+        $this->adminOnly();
+
         $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:50',
+            'name'           => 'required|string|max:255',
+            'phone'          => 'nullable|string|max:50',
             'contact_person' => 'nullable|string|max:255',
         ]);
 
         Supplier::create($validatedData);
-
         return redirect()->route('suppliers.index')->with('success', 'Доставчикът е добавен успешно!');
     }
 
     public function edit(Supplier $supplier)
     {
+        $this->adminOnly();
         return view('suppliers.edit', compact('supplier'));
     }
 
     public function update(Request $request, Supplier $supplier)
     {
+        $this->adminOnly();
+
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:50',
+            'name'           => 'required|string|max:255',
+            'phone'          => 'nullable|string|max:50',
             'contact_person' => 'nullable|string|max:255',
         ]);
 
@@ -73,6 +64,7 @@ class SupplierController extends Controller implements HasMiddleware
 
     public function destroy(Supplier $supplier)
     {
+        $this->adminOnly();
         $supplier->delete();
         return redirect()->route('suppliers.index')->with('success', 'Доставчикът е премахнат успешно!');
     }
